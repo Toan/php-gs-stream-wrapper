@@ -1,11 +1,11 @@
-S3StreamWrapper
+GSStreamWrapper (beta)
 ===============
 
-These stream wrappers allow you to use S3 and Google Storage (almost) like a local file system:
+These stream wrappers allow you to use Google Storage like a local file system use Oauth2.0 Authentication:
 
-  - `file_get_contents('s3://access-key:secret-key/bucket/path/to/a/file.txt');`
+  - `file_get_contents('gs://bucket/path/to/a/file.txt');`
 
-  - `scandir('s3://access-key:secret-key/bucket/path/to/a/dir/');`
+  - `scandir('gs://bucket/path/to/a/dir/');`
 
   - `fopen(...);`
 
@@ -16,53 +16,31 @@ These stream wrappers allow you to use S3 and Google Storage (almost) like a loc
 Requirements
 ------------
 
-  - PHP 5.3 (for the dechunk filter)
-  - The Hash extension (enabled by default since PHP 5.1.2)
+  - PHP 5.4.0 (or higher)
+  - Google APIs Client Library 2.0
 
 Usage
 -----
 
-    require_once 'S3StreamWrapper.php';
+    <?php
+    //include composer autoload
+    include_once __DIR__ . '/vendor/autoload.php';
     require_once 'GSStreamWrapper.php';
-    
-    stream_wrapper_register('s3', 'S3StreamWrapper');
-    stream_wrapper_register('gs', 'GSStreamWrapper');
-    
+
+    $client = new Google_Client();
+    //add your server_secrets.json file (account service)
+    $client->setAuthConfigFile('server_secrets.json');
+    $client->useApplicationDefaultCredentials();
+    $client->addScope(array(
+        Google_Service_Storage::CLOUD_PLATFORM,
+        Google_Service_Storage::CLOUD_PLATFORM_READ_ONLY,
+        Google_Service_Storage::DEVSTORAGE_FULL_CONTROL,
+        Google_Service_Storage::DEVSTORAGE_READ_ONLY,
+        Google_Service_Storage::DEVSTORAGE_READ_WRITE,
+    ));
+    $service = new Google_Service_Storage($client);
+
+    \GSStreamWrapper::setService($service);
+    \GSStreamWrapper::registerWrapper();
+
     // Use it!
-    
-Caveats
--------
-
-Streams reads, but unfortunately buffers writes (using a file), since S3 does not support chunked PUTs and we must know the size in advance. On the plus side, this way we can calculate the MD5 hash, which must also be known at the beginning of an upload.
-
-Writes on flush or close (use flush to get a return value). Returns an error if `write()`'ing after a `flush()`, to help you accidentally writing scripts that would do multiple uploads.
-
-Does not behave quite like a normal filesystem:   
-
-  - You can write to any file, and parent directories will be created automatically.                                                      
-  - You can open any directory, even if it doesn't exist. It will be empty.
-
-Multipart upload is not supported and I have no plans of adding it myself.
-
-License (MIT)
--------------
-
-    Copyright (c) 2011 Jaka Jancar <jaka@kubje.org>
-
-    Permission is hereby granted, free of charge, to any person obtaining a copy
-    of this software and associated documentation files (the "Software"), to deal
-    in the Software without restriction, including without limitation the rights
-    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-    copies of the Software, and to permit persons to whom the Software is
-    furnished to do so, subject to the following conditions:
-
-    The above copyright notice and this permission notice shall be included in
-    all copies or substantial portions of the Software.
-
-    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-    THE SOFTWARE.
