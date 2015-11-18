@@ -16,11 +16,14 @@ class GSStreamWrapper
     protected $fileMode;
     protected $dir;
     protected static $mimes = array();
+    protected $filecontext;
+
+    public $context;
 
     /**
-     * Set Google storage service object
+     * Set Google drive service object
      *
-     * @param \Google_Service_Storage $service Google storage service object
+     * @param \Google_Service_Storage $service Google drive service object
      *
      * @return void
      */
@@ -180,6 +183,8 @@ class GSStreamWrapper
      * @return boolean
      */
     public function stream_open($path, $mode, $options) {
+        $context = stream_context_get_options($this->context);
+        $this->filecontext = $context['gs'];
         $this->filePosition = 0;
         try{
             $file = $this->getItemByPath($this->parse_URI($path));
@@ -210,6 +215,7 @@ class GSStreamWrapper
      */
     public function stream_read($count)
     {
+
         if($this->file) {
             if (0 < $count) {
                 $result = substr($this->downloadFile(), $this->filePosition, $count);
@@ -218,7 +224,6 @@ class GSStreamWrapper
         } else {
             $result = '';
         }
-
 
         return $result;
     }
@@ -240,16 +245,30 @@ class GSStreamWrapper
 
             $this->filePosition += strlen($data);
 
-
-
-
-            $this->file = $this->file
-                ? $this->UpdateFile()
-                : $this->InsertFile();
             $size = strlen($data);
         }
 
         return $size;
+    }
+
+    public function stream_flush() {
+        if (substr($this->fileMode, 0, 1)=='r') {
+            return false;
+        }
+
+        $this->file = $this->file
+            ? $this->UpdateFile()
+            : $this->InsertFile();
+    }
+
+    /**
+     * ftell() wrapper
+     *
+     * @return integer
+     */
+    public function stream_tell()
+    {
+        return $this->filePosition;
     }
 
     /**
@@ -267,7 +286,7 @@ class GSStreamWrapper
      *
      * @return boolean
      */
-    public function close()
+    public function stream_close()
     {
         $this->file = null;
         $this->path = null;
@@ -316,7 +335,6 @@ class GSStreamWrapper
             $this->parse_URI($path_to);
             $this->InsertFile();
             $result = $result;
-//
         }
 
         return $result;
@@ -391,7 +409,7 @@ class GSStreamWrapper
      */
     protected function detectMimetype($path)
     {
-        return empty(static::$mimes[$path]) ? 'text/plain' : static::$mimes[$path];
+        return empty(static::$mimes[$path]) ? 'binary/octet-stream' : static::$mimes[$path];
     }
 
     protected function DeleteFile() {
@@ -407,7 +425,8 @@ class GSStreamWrapper
     protected function InsertFile() {
         $postBody = new Google_Service_Storage_StorageObject();
         $postBody->setName($this->path);
-        return static::$service->objects->insert($this->bucket, $postBody, array('data' => $this->fileBody, 'mimeType' => $this->detectMimetype($this->filePath), 'uploadType' => 'multipart'));
+        if(isset($this->filecontext['Content-Type'])):$content_type = $this->filecontext['Content-Type'];else:$content_type = $this->detectMimetype($this->path);endif;
+        return static::$service->objects->insert($this->bucket, $postBody, array('data' => $this->fileBody, 'mimeType' => $content_type, 'uploadType' => 'resumable'));
     }
 
     protected function getItemByPath($path) {
@@ -437,7 +456,7 @@ class GSStreamWrapper
                 $this->fileBody = $response->getBody();
             }
         } else {
-            $this->fileBody = false;
+            //$this->fileBody = false;
         }
         return $this->fileBody;
     }

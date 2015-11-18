@@ -21,7 +21,7 @@ Requirements
 
 Usage
 -----
-
+``` php
     <?php
     //include composer autoload
     include_once __DIR__ . '/vendor/autoload.php';
@@ -44,3 +44,4 @@ Usage
     \GSStreamWrapper::registerWrapper();
 
     // Use it!
+```
