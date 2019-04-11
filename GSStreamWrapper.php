@@ -1,4 +1,5 @@
 <?php
+
 class GSStreamWrapper
 {
     const SCHEME = 'gs';
@@ -13,6 +14,7 @@ class GSStreamWrapper
 
     protected $file;
     protected $fileBody;
+    protected $bufferSize;
     protected $fileMode;
     protected $dir;
     protected static $mimes = array();
@@ -66,8 +68,8 @@ class GSStreamWrapper
     /**
      * mkdir() wrapper
      *
-     * @param string  $path    Directory path
-     * @param integer $mode    Permission mode
+     * @param string $path Directory path
+     * @param integer $mode Permission mode
      * @param integer $options Options
      *
      * @return boolean
@@ -95,7 +97,7 @@ class GSStreamWrapper
     /**
      * opendir() wrapper
      *
-     * @param string  $path    Directory patrh
+     * @param string $path Directory patrh
      * @param integer $options Options NOT SUPPORT
      *
      * @return boolean
@@ -104,7 +106,7 @@ class GSStreamWrapper
     {
         try {
             $dir = $this->getItemByPath($this->parse_URI($path));
-        } catch(\Exception $e){
+        } catch (\Exception $e) {
             $dir = null;
         }
         $this->dir = $dir;
@@ -124,8 +126,6 @@ class GSStreamWrapper
         }
 
 
-
-
         $item = each($this->dirItems);
         if (!$item[1]) {
             return false;
@@ -139,7 +139,7 @@ class GSStreamWrapper
     /**
      * rmdir() wrapper
      *
-     * @param string  $path    Directory patrh
+     * @param string $path Directory patrh
      * @param integer $options Options NOT SUPPORT
      *
      * @return boolean
@@ -157,7 +157,7 @@ class GSStreamWrapper
     /**
      * stat() wrapper
      *
-     * @param string  $path  Path
+     * @param string $path Path
      * @param integer $flags Flags NOT SUPPORT
      *
      * @return array
@@ -165,6 +165,7 @@ class GSStreamWrapper
     public function url_stat($path, $flags)
     {
         $file = $this->getItemByPath($this->parse_URI($path));
+        //print_r($test);exit();
 
         return $file ? $this->getStat($file) : false;
     }
@@ -176,19 +177,21 @@ class GSStreamWrapper
     /**
      * fopen() wrapper
      *
-     * @param string  $path    Directory patrh
-     * @param string  $mode    File open mode
+     * @param string $path Directory patrh
+     * @param string $mode File open mode
      * @param integer $options Options NOT SUPPORT
      *
      * @return boolean
      */
-    public function stream_open($path, $mode, $options) {
+    public function stream_open($path, $mode, $options)
+    {
         $context = stream_context_get_options($this->context);
+        if (!isset($context['gs'])) $context['gs'] = '';
         $this->filecontext = $context['gs'];
         $this->filePosition = 0;
-        try{
+        try {
             $file = $this->getItemByPath($this->parse_URI($path));
-        } catch(\Exception $e) {
+        } catch (\Exception $e) {
             $file = null;
         }
 
@@ -198,7 +201,7 @@ class GSStreamWrapper
 
         }
 
-        if($file) {
+        if ($file) {
             $this->fileMode = $mode;
             $this->file = $file;
         }
@@ -216,7 +219,7 @@ class GSStreamWrapper
     public function stream_read($count)
     {
 
-        if($this->file) {
+        if ($this->file) {
             if (0 < $count) {
                 $result = substr($this->downloadFile(), $this->filePosition, $count);
                 $this->filePosition += $count;
@@ -228,11 +231,16 @@ class GSStreamWrapper
         return $result;
     }
 
+    public function stream_eof()
+    {
+        return ($this->bufferSize < $this->filePosition);
+    }
+
     public function stream_write($data)
     {
         $size = 0;
         if ('r' != substr($this->fileMode, 0, 1)) {
-            if($this->file && 'w' != substr($this->fileMode, 0, 1)) {
+            if ($this->file && 'w' != substr($this->fileMode, 0, 1)) {
                 $this->downloadFile();
             }
 
@@ -251,8 +259,9 @@ class GSStreamWrapper
         return $size;
     }
 
-    public function stream_flush() {
-        if (substr($this->fileMode, 0, 1)=='r') {
+    public function stream_flush()
+    {
+        if (substr($this->fileMode, 0, 1) == 'r') {
             return false;
         }
 
@@ -319,7 +328,7 @@ class GSStreamWrapper
      * rename() wrapper
      *
      * @param string $path_from Path (from)
-     * @param string $path_to   Path (to)
+     * @param string $path_to Path (to)
      *
      * @return boolean
      */
@@ -335,6 +344,7 @@ class GSStreamWrapper
             $this->parse_URI($path_to);
             $this->InsertFile();
             $result = $result;
+//
         }
 
         return $result;
@@ -358,7 +368,7 @@ class GSStreamWrapper
             0,
             $this->isDir($file) ? 0040600 : 0100600,
             0,
-            current($file->getOwner()),
+            ($file->getOwner()),
             0,
             0,
             $file->getSize(),
@@ -369,19 +379,19 @@ class GSStreamWrapper
             -1,
         );
 
-        $result['dev']     = $result[0];
-        $result['ino']     = $result[1];
-        $result['mode']    = $result[2];
-        $result['nlink']   = $result[3];
-        $result['uid']     = $result[4];
-        $result['gid']     = $result[5];
-        $result['rdev']    = $result[6];
-        $result['size']    = $result[7];
-        $result['atime']   = $result[8];
-        $result['mtime']   = $result[9];
-        $result['ctime']   = $result[10];
+        $result['dev'] = $result[0];
+        $result['ino'] = $result[1];
+        $result['mode'] = $result[2];
+        $result['nlink'] = $result[3];
+        $result['uid'] = $result[4];
+        $result['gid'] = $result[5];
+        $result['rdev'] = $result[6];
+        $result['size'] = $result[7];
+        $result['atime'] = $result[8];
+        $result['mtime'] = $result[9];
+        $result['ctime'] = $result[10];
         $result['blksize'] = $result[11];
-        $result['blocks']  = $result[12];
+        $result['blocks'] = $result[12];
 
         return $result;
     }
@@ -396,7 +406,7 @@ class GSStreamWrapper
     protected function isDir(\Google_Service_Storage_StorageObject $file)
     {
         $name = $file->getName();
-        if(substr($name, -1)=='/')return true;
+        if (substr($name, -1) == '/') return true;
         return false;
     }
 
@@ -412,48 +422,55 @@ class GSStreamWrapper
         return empty(static::$mimes[$path]) ? 'binary/octet-stream' : static::$mimes[$path];
     }
 
-    protected function DeleteFile() {
+    protected function DeleteFile()
+    {
         static::$service->objects->delete($this->bucket, $this->path);
     }
 
-    protected  function UpdateFile() {
+    protected function UpdateFile()
+    {
         $this->DeleteFile();
         $this->InsertFile();
         return true;
     }
 
-    protected function InsertFile() {
+    protected function InsertFile()
+    {
         $postBody = new Google_Service_Storage_StorageObject();
         $postBody->setName($this->path);
-        if(isset($this->filecontext['Content-Type'])):$content_type = $this->filecontext['Content-Type'];else:$content_type = $this->detectMimetype($this->path);endif;
+        if (isset($this->filecontext['Content-Type'])):$content_type = $this->filecontext['Content-Type'];
+        else:$content_type = $this->detectMimetype($this->path);endif;
         return static::$service->objects->insert($this->bucket, $postBody, array('data' => $this->fileBody, 'mimeType' => $content_type, 'uploadType' => 'resumable'));
     }
 
-    protected function getItemByPath($path) {
+    protected function getItemByPath($path)
+    {
         try {
             $file = static::$service->objects->get($this->bucket, $path);
-        } catch(\Exception $e) {
+        } catch (\Exception $e) {
             return false;
         }
         return $file;
     }
 
-    protected function parse_URI($path) {
+    protected function parse_URI($path)
+    {
         $parsed = parse_url($path);
         $this->bucket = $parsed['host'];
         $this->path = substr($parsed['path'], 1);
         return $this->path;
     }
 
-    protected function downloadFile() {
+    protected function downloadFile()
+    {
         if (!isset($this->fileBody)) {
             $httpClient = new GuzzleHttp\Client();
-            static::$service->getClient()->authorize($httpClient);
-            $request = $httpClient->createRequest('GET', $this->file->mediaLink);
-            $response = $httpClient->send($request);
-
+            $http = static::$service->getClient()->authorize();
+            $request = new \GuzzleHttp\Psr7\Request('GET', $this->file->mediaLink);
+            $response = $http->send($request);
             if ($response->getStatusCode() == 200) {
                 $this->fileBody = $response->getBody();
+                $this->bufferSize = strlen($this->fileBody);
             }
         } else {
             //$this->fileBody = false;
@@ -461,7 +478,8 @@ class GSStreamWrapper
         return $this->fileBody;
     }
 
-    protected  function getSubitems($file) {
+    protected function getSubitems($file)
+    {
         $array_filter = array();
         $array_filter['delimiter'] = '/';
         $array_filter['prefix'] = $file->getName();
@@ -469,15 +487,14 @@ class GSStreamWrapper
 
         $subitem = static::$service->objects->listObjects($this->bucket, $array_filter);
         $list_file = array();
-        foreach($subitem->getItems() as $value) {
-            if($value->getName()!=$array_filter['prefix'])
-                $list_file[] = str_replace($array_filter['prefix'],'',$value->getName());
+        foreach ($subitem->getItems() as $value) {
+            if ($value->getName() != $array_filter['prefix'])
+                $list_file[] = str_replace($array_filter['prefix'], '', $value->getName());
         }
-        foreach($subitem->getPrefixes() as $value) {
-            $list_file[] = str_replace($array_filter['prefix'],'',$value);
+        foreach ($subitem->getPrefixes() as $value) {
+            $list_file[] = str_replace($array_filter['prefix'], '', $value);
         }
         return $list_file;
     }
 
-    // }}}
 }
